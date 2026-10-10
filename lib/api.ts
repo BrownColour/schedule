@@ -28,7 +28,6 @@ export async function fetchCourses() {
   return data as Course[]
 }
 
-// id is passed in from the caller (generated client-side) so optimistic + real IDs always match
 export async function saveCourse(c: Omit<Course, 'created_at'>): Promise<Course> {
   const row = { ...c, created_at: new Date().toISOString() }
   const { error } = await supabase.from('courses').insert(row)
@@ -59,7 +58,6 @@ export async function fetchEvents() {
   return data as Ev[]
 }
 
-// id is passed in from caller so optimistic + real IDs always match
 export async function saveEvent(e: Omit<Ev, 'created_at' | 'updated_at'>): Promise<Ev> {
   const now = new Date().toISOString()
   const row = { ...e, created_at: now, updated_at: now }

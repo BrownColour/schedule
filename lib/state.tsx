@@ -78,7 +78,7 @@ interface Ctx extends AppState {
   addEvent: (e: Omit<Ev, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
   updateEvent: (id: string, patch: Partial<Ev>) => Promise<void>
   removeEvent: (id: string) => Promise<void>
-  addRecurringEvents: (base: Omit<Ev, 'id'|'created_at'|'updated_at'|'date'|'recurring_group_id'>, start: string, days: number[], until: string) => Promise<void>
+  addRecurringEvents: (base: Omit<Ev, 'id' | 'created_at' | 'updated_at' | 'date' | 'recurring_group_id'>, start: string, days: number[], until: string) => Promise<void>
   rescheduleEvent: (id: string, date: string, start: string, end: string, room: string) => Promise<void>
   addCourse: (c: Omit<Course, 'id' | 'created_at'>) => Promise<void>
   updateCourse: (id: string, patch: Partial<Course>) => Promise<void>
@@ -101,19 +101,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const CACHE_KEY = 'tmr_cache'
-
   const saveCache = (data: { trimesters: Trimester[]; courses: Course[]; events: Ev[]; attendance: Attendance[] }) => {
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)) } catch {}
   }
-
-  const loadCache = (): { trimesters: Trimester[]; courses: Course[]; events: Ev[]; attendance: Attendance[] } | null => {
+  const loadCache = () => {
     try { const raw = localStorage.getItem(CACHE_KEY); return raw ? JSON.parse(raw) : null } catch { return null }
   }
 
   const load = useCallback(async () => {
     dispatch({ type: 'SET_LOADING', v: true })
-
-    // Show cached data immediately while fetching
     const cached = loadCache()
     if (cached) {
       dispatch({ type: 'SET_TRIMESTERS', data: cached.trimesters })
@@ -121,7 +117,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_EVENTS', data: cached.events })
       dispatch({ type: 'SET_ATTENDANCE', data: cached.attendance })
     }
-
     try {
       const [tri, courses, events, att] = await Promise.all([
         api.fetchTrimesters(), api.fetchCourses(), api.fetchEvents(), api.fetchAttendance()
@@ -132,30 +127,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_ATTENDANCE', data: att })
       saveCache({ trimesters: tri, courses, events, attendance: att })
     } catch (e: any) {
-      if (cached) {
-        toast('Offline — showing cached data')
-      } else {
-        toast('Could not load data: ' + e.message)
-      }
+      if (cached) toast('Offline — showing cached data')
+      else toast('Could not load data: ' + e.message)
     } finally {
       dispatch({ type: 'SET_LOADING', v: false })
     }
   }, [toast])
 
-  // Restore from localStorage
   useEffect(() => {
     const p = localStorage.getItem('tmr_profile') as Profile | null
     const tri = localStorage.getItem('tmr_active_tri')
     const theme = localStorage.getItem('tmr_theme') as 'dark' | 'light' | null
     if (p) dispatch({ type: 'SET_PROFILE', profile: p })
     if (tri) dispatch({ type: 'SET_ACTIVE_TRI', id: tri })
-    if (theme) dispatch({ type: 'SET_THEME', theme })
-    else dispatch({ type: 'SET_THEME', theme: 'dark' })
+    dispatch({ type: 'SET_THEME', theme: theme || 'dark' })
   }, [])
 
-  useEffect(() => {
-    if (s.profile) load()
-  }, [s.profile, load])
+  useEffect(() => { if (s.profile) load() }, [s.profile, load])
 
   useEffect(() => {
     document.documentElement.dataset.profile = s.profile || ''
@@ -176,16 +164,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_THEME', theme: t })
   }
 
-  // ── Events ────────────────────────────────────────────────────────────────
   const now = new Date().toISOString()
   const makeOptEv = (e: Omit<Ev, 'id' | 'created_at' | 'updated_at'>): Ev =>
     ({ ...e, id: crypto.randomUUID(), created_at: now, updated_at: now })
 
+  // ── Events ────────────────────────────────────────────────────────────────
   const addEvent = async (e: Omit<Ev, 'id' | 'created_at' | 'updated_at'>) => {
     const opt = makeOptEv(e)
     dispatch({ type: 'OPT_ADD_EVENT', ev: opt })
     try {
-      // Pass the same ID so Supabase row matches the optimistic one
       const real = await api.saveEvent({ ...e, id: opt.id })
       dispatch({ type: 'OPT_UPDATE_EVENT', ev: real })
     } catch (err: any) {
@@ -219,7 +206,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const addRecurringEvents = async (
-    base: Omit<Ev, 'id'|'created_at'|'updated_at'|'date'|'recurring_group_id'>,
+    base: Omit<Ev, 'id' | 'created_at' | 'updated_at' | 'date' | 'recurring_group_id'>,
     start: string, days: number[], until: string
   ) => {
     try {
@@ -245,7 +232,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const opt: Course = { ...c, id: crypto.randomUUID(), created_at: now }
     dispatch({ type: 'OPT_ADD_COURSE', course: opt })
     try {
-      // Pass the same ID so Supabase row matches the optimistic one
       const real = await api.saveCourse({ ...c, id: opt.id })
       dispatch({ type: 'OPT_UPDATE_COURSE', course: real })
     } catch (err: any) {

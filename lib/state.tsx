@@ -100,8 +100,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTimeout(() => dispatch({ type: 'CLEAR_TOAST' }), 3500)
   }, [])
 
+  const CACHE_KEY = 'tmr_cache'
+
+  const saveCache = (data: { trimesters: Trimester[]; courses: Course[]; events: Ev[]; attendance: Attendance[] }) => {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)) } catch {}
+  }
+
+  const loadCache = (): { trimesters: Trimester[]; courses: Course[]; events: Ev[]; attendance: Attendance[] } | null => {
+    try { const raw = localStorage.getItem(CACHE_KEY); return raw ? JSON.parse(raw) : null } catch { return null }
+  }
+
   const load = useCallback(async () => {
     dispatch({ type: 'SET_LOADING', v: true })
+
+    // Show cached data immediately while fetching
+    const cached = loadCache()
+    if (cached) {
+      dispatch({ type: 'SET_TRIMESTERS', data: cached.trimesters })
+      dispatch({ type: 'SET_COURSES', data: cached.courses })
+      dispatch({ type: 'SET_EVENTS', data: cached.events })
+      dispatch({ type: 'SET_ATTENDANCE', data: cached.attendance })
+    }
+
     try {
       const [tri, courses, events, att] = await Promise.all([
         api.fetchTrimesters(), api.fetchCourses(), api.fetchEvents(), api.fetchAttendance()
@@ -110,8 +130,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_COURSES', data: courses })
       dispatch({ type: 'SET_EVENTS', data: events })
       dispatch({ type: 'SET_ATTENDANCE', data: att })
+      saveCache({ trimesters: tri, courses, events, attendance: att })
     } catch (e: any) {
-      toast('Could not load data: ' + e.message)
+      if (cached) {
+        toast('Offline — showing cached data')
+      } else {
+        toast('Could not load data: ' + e.message)
+      }
     } finally {
       dispatch({ type: 'SET_LOADING', v: false })
     }

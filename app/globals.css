@@ -1,14 +1,14 @@
 /* ── Design tokens ─────────────────────────────────────────────────────────── */
 :root {
-  --bg:   #0a0a0f;
-  --s1:   #0f0f17;
-  --s2:   #12121c;
-  --s3:   #1a1a28;
-  --s4:   #222234;
+  --bg:   #000000;
+  --s1:   #0d0d0d;
+  --s2:   #141414;
+  --s3:   #1c1c1c;
+  --s4:   #242424;
   --tx:   #e8e8f0;
-  --tx2:  #a0a0b8;
-  --tx3:  #5a5a72;
-  --sep:  rgba(255,255,255,.07);
+  --tx2:  #999999;
+  --tx3:  #555555;
+  --sep:  rgba(255,255,255,.09);
   --ac:   #ff453a;
   --ac2:  color-mix(in srgb, var(--ac) 15%, transparent);
   --radius: 10px;
@@ -31,7 +31,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 14px; }
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;;
+  font-family: var(--font-inter, 'Inter', sans-serif);
   background: var(--bg);
   color: var(--tx);
   line-height: 1.5;

@@ -9,8 +9,15 @@ export const addDays = (d: Date, n: number): Date => {
   return x
 }
 
-export const hhmm = (t: string | null | undefined): string =>
-  t ? t.slice(0, 5) : ''
+// Convert "HH:MM" or "HH:MM:SS" → "h:MMam/pm"
+export const hhmm = (t: string | null | undefined): string => {
+  if (!t) return ''
+  const h = parseInt(t.slice(0, 2))
+  const m = t.slice(3, 5)
+  const ampm = h >= 12 ? 'pm' : 'am'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return m === '00' ? `${h12}${ampm}` : `${h12}:${m}${ampm}`
+}
 
 export const defaultEnd = (start: string): string => {
   const h = parseInt(start.slice(0, 2))

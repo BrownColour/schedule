@@ -283,7 +283,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const opt: Trimester = { ...t, id: crypto.randomUUID(), created_at: now }
     dispatch({ type: 'OPT_ADD_TRIMESTER', t: opt })
     try {
-      const real = await api.createTrimester(t)
+      const real = await api.createTrimester({ ...t, id: opt.id })
       dispatch({ type: 'OPT_REMOVE_TRIMESTER', id: opt.id })
       dispatch({ type: 'OPT_ADD_TRIMESTER', t: real })
     } catch (err: any) {

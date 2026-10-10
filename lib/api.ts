@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
-import type { Trimester, Course, Ev, Attendance, Profile } from './types'
-import { ymd, addDays, defaultEnd } from './utils'
+import type { Trimester, Course, Ev, Attendance } from './types'
+import { ymd, addDays } from './utils'
 
 // ── Trimesters ────────────────────────────────────────────────────────────────
 export async function fetchTrimesters() {
@@ -9,11 +9,11 @@ export async function fetchTrimesters() {
   return data as Trimester[]
 }
 
-export async function createTrimester(t: Omit<Trimester, 'id' | 'created_at'>) {
-  const row = { ...t, id: crypto.randomUUID(), created_at: new Date().toISOString() }
-  const { data, error } = await supabase.from('trimesters').insert(row).select().single()
+export async function createTrimester(t: Omit<Trimester, 'created_at'>) {
+  const row = { ...t, created_at: new Date().toISOString() }
+  const { error } = await supabase.from('trimesters').insert(row)
   if (error) throw error
-  return data as Trimester
+  return row as Trimester
 }
 
 export async function deleteTrimester(id: string) {
@@ -28,17 +28,23 @@ export async function fetchCourses() {
   return data as Course[]
 }
 
-export async function saveCourse(c: Omit<Course, 'id' | 'created_at'>): Promise<Course> {
-  const row = { ...c, id: crypto.randomUUID(), created_at: new Date().toISOString() }
-  const { data, error } = await supabase.from('courses').insert(row).select().single()
+// id is passed in from the caller (generated client-side) so optimistic + real IDs always match
+export async function saveCourse(c: Omit<Course, 'created_at'>): Promise<Course> {
+  const row = { ...c, created_at: new Date().toISOString() }
+  const { error } = await supabase.from('courses').insert(row)
   if (error) throw error
-  return data as Course
+  return row as Course
 }
 
 export async function updateCourse(id: string, patch: Partial<Course>): Promise<Course> {
-  const { data, error } = await supabase.from('courses').update(patch).eq('id', id).select().single()
+  const { data, error } = await supabase
+    .from('courses')
+    .update(patch)
+    .eq('id', id)
+    .select()
   if (error) throw error
-  return data as Course
+  if (!data || data.length === 0) throw new Error('Course not found')
+  return data[0] as Course
 }
 
 export async function deleteCourse(id: string) {
@@ -53,19 +59,24 @@ export async function fetchEvents() {
   return data as Ev[]
 }
 
-export async function saveEvent(e: Omit<Ev, 'id' | 'created_at' | 'updated_at'>): Promise<Ev> {
+// id is passed in from caller so optimistic + real IDs always match
+export async function saveEvent(e: Omit<Ev, 'created_at' | 'updated_at'>): Promise<Ev> {
   const now = new Date().toISOString()
-  const row = { ...e, id: crypto.randomUUID(), created_at: now, updated_at: now }
-  const { data, error } = await supabase.from('events').insert(row).select().single()
+  const row = { ...e, created_at: now, updated_at: now }
+  const { error } = await supabase.from('events').insert(row)
   if (error) throw error
-  return data as Ev
+  return row as Ev
 }
 
 export async function updateEvent(id: string, patch: Partial<Ev>): Promise<Ev> {
   const { data, error } = await supabase
-    .from('events').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id).select().single()
+    .from('events')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
   if (error) throw error
-  return data as Ev
+  if (!data || data.length === 0) throw new Error('Event not found')
+  return data[0] as Ev
 }
 
 export async function deleteEvent(id: string) {
@@ -77,25 +88,25 @@ export async function deleteEvent(id: string) {
 export async function saveRecurringEvents(
   base: Omit<Ev, 'id' | 'created_at' | 'updated_at' | 'date' | 'recurring_group_id'>,
   startDate: string,
-  weekdays: number[],      // 0=Mon … 6=Sun
+  weekdays: number[],
   until: string
 ): Promise<Ev[]> {
   const groupId = crypto.randomUUID()
-  const rows: Omit<Ev, 'id' | 'created_at' | 'updated_at'>[] = []
+  const rows: Omit<Ev, 'created_at' | 'updated_at'>[] = []
   let cur = new Date(startDate + 'T00:00:00')
   const end = new Date(until + 'T00:00:00')
   while (cur <= end) {
-    const dow = cur.getDay() === 0 ? 6 : cur.getDay() - 1 // Mon=0
+    const dow = cur.getDay() === 0 ? 6 : cur.getDay() - 1
     if (weekdays.includes(dow)) {
-      rows.push({ ...base, date: ymd(cur), recurring_group_id: groupId })
+      rows.push({ ...base, id: crypto.randomUUID(), date: ymd(cur), recurring_group_id: groupId })
     }
     cur = addDays(cur, 1)
   }
   const now = new Date().toISOString()
-  const full = rows.map(r => ({ ...r, id: crypto.randomUUID(), created_at: now, updated_at: now }))
-  const { data, error } = await supabase.from('events').insert(full).select()
+  const full = rows.map(r => ({ ...r, created_at: now, updated_at: now }))
+  const { error } = await supabase.from('events').insert(full)
   if (error) throw error
-  return data as Ev[]
+  return full as Ev[]
 }
 
 // Reschedule: cancel original, create new linked event
@@ -107,11 +118,26 @@ export async function rescheduleEvent(
   newRoom: string,
   original: Ev
 ): Promise<{ cancelled: Ev; created: Ev }> {
-  const [cancelled, created] = await Promise.all([
-    updateEvent(originalId, { status: 'cancelled', linked_to: null }),
-    saveEvent({ profile: original.profile, trimester_id: original.trimester_id, course_id: original.course_id, type: original.type, title: original.title, description: original.description, date: newDate, start_time: newStart, end_time: newEnd, room: newRoom, status: 'scheduled', linked_to: originalId, recurring_group_id: '' })
+  const newId = crypto.randomUUID()
+  const now = new Date().toISOString()
+  const newEv: Ev = {
+    ...original,
+    id: newId,
+    date: newDate,
+    start_time: newStart,
+    end_time: newEnd,
+    room: newRoom,
+    status: 'scheduled',
+    linked_to: originalId,
+    recurring_group_id: '',
+    created_at: now,
+    updated_at: now,
+  }
+  const [cancelled] = await Promise.all([
+    updateEvent(originalId, { status: 'cancelled', linked_to: newId }),
+    saveEvent(newEv),
   ])
-  return { cancelled, created }
+  return { cancelled, created: newEv }
 }
 
 // ── Attendance ────────────────────────────────────────────────────────────────
@@ -122,8 +148,9 @@ export async function fetchAttendance() {
 }
 
 export async function upsertAttendance(a: Attendance) {
-  const { data, error } = await supabase
-    .from('attendance').upsert({ ...a, updated_at: new Date().toISOString() }, { onConflict: 'event_id' }).select().single()
+  const { error } = await supabase
+    .from('attendance')
+    .upsert({ ...a, updated_at: new Date().toISOString() }, { onConflict: 'event_id' })
   if (error) throw error
-  return data as Attendance
+  return a
 }

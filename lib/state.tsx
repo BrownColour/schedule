@@ -185,7 +185,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const opt = makeOptEv(e)
     dispatch({ type: 'OPT_ADD_EVENT', ev: opt })
     try {
-      const real = await api.saveEvent(e)
+      // Pass the same ID so Supabase row matches the optimistic one
+      const real = await api.saveEvent({ ...e, id: opt.id })
       dispatch({ type: 'OPT_UPDATE_EVENT', ev: real })
     } catch (err: any) {
       dispatch({ type: 'OPT_REMOVE_EVENT', id: opt.id })
@@ -244,7 +245,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const opt: Course = { ...c, id: crypto.randomUUID(), created_at: now }
     dispatch({ type: 'OPT_ADD_COURSE', course: opt })
     try {
-      const real = await api.saveCourse(c)
+      // Pass the same ID so Supabase row matches the optimistic one
+      const real = await api.saveCourse({ ...c, id: opt.id })
       dispatch({ type: 'OPT_UPDATE_COURSE', course: real })
     } catch (err: any) {
       dispatch({ type: 'OPT_REMOVE_COURSE', id: opt.id })

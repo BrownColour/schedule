@@ -92,7 +92,7 @@ export function CompareTable({ date, now, onEventClick }: Props) {
           const s = dayStart(list)
           const e = dayEnd(list)
           return (
-            <div key={p} className={`cmp-head ${HeadClass(p)}`} style={{ padding: '10px 8px' }}>
+            <div key={p} className={`cmp-head ${HeadClass(p!)}`} style={{ padding: '10px 8px' }}>
               <div style={{ fontWeight: 700 }}>{p}</div>
               {s && e && (
                 <div style={{ fontSize: 10, fontWeight: 400, opacity: .7, marginTop: 2 }}>{s} – {e}</div>

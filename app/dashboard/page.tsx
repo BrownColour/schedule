@@ -19,25 +19,20 @@ export default function Dashboard() {
   const nums = useMemo(() => sessionNumbers(events), [events])
   const today = ymd(now)
   const tomorrow = ymd(addDays(now, 1))
-
+  const weekEnd = ymd(addDays(now, 7))
   const other = profile === 'S' ? 'K' : 'S'
 
-  // Coming week: days 2–7 from today
-  const myWeek = useMemo(() =>
-    events.filter(e => e.profile === profile && e.date > tomorrow && e.date <= ymd(addDays(now, 7)))
+  // Coming week: days 2–7 from today, both users
+  const allWeekEvs = useMemo(() =>
+    events.filter(e => e.date > tomorrow && e.date <= weekEnd)
       .sort((a, b) => (a.date + (a.start_time || '')).localeCompare(b.date + (b.start_time || ''))),
-    [events, profile, tomorrow, now])
+    [events, tomorrow, weekEnd])
 
-  const otherWeek = useMemo(() =>
-    events.filter(e => e.profile === other && e.date >= today && e.date <= ymd(addDays(now, 7))),
-    [events, other, today, now])
-
-  // Group myWeek by date
-  const myWeekByDate = useMemo(() => {
-    const map: Record<string, Ev[]> = {}
-    myWeek.forEach(e => { map[e.date] = [...(map[e.date] || []), e] })
-    return map
-  }, [myWeek])
+  // Collect all dates that have events for either user
+  const weekDates = useMemo(() => {
+    const dates = new Set(allWeekEvs.map(e => e.date))
+    return [...dates].sort()
+  }, [allWeekEvs])
 
   if (!profile) {
     return (
@@ -63,45 +58,72 @@ export default function Dashboard() {
         <button className="btn btn-primary btn-sm" onClick={() => setAddModal(true)}>+ Add event</button>
       </div>
 
-      {/* Today vs Tomorrow comparison */}
-      <CompareTable date={today} now={now} onEventClick={setEditEv} />
+      {/* Today & tomorrow comparison tables */}
+      <CompareTable date={today}    now={now} onEventClick={setEditEv} />
       <CompareTable date={tomorrow} now={now} onEventClick={setEditEv} />
 
       <hr className="divider" />
 
-      {/* Coming week: own events */}
-      <h2 style={{ marginBottom: 14 }}>Your week</h2>
-      {Object.keys(myWeekByDate).length === 0 ? (
+      {/* Coming week: both users side by side per day */}
+      <h2 style={{ marginBottom: 16 }}>Coming week</h2>
+      {weekDates.length === 0 ? (
         <p style={{ color: 'var(--tx3)', fontSize: 13 }}>Nothing more this week.</p>
       ) : (
-        Object.entries(myWeekByDate).map(([date, evs]) => (
-          <div key={date} className="agenda-day">
-            <div className="agenda-date">{formatDateDisplay(date, { weekday: 'long', month: 'short', day: 'numeric' })}</div>
-            {evs.map(e => <EventCard key={e.id} ev={e} courses={courses} nums={nums} onClick={() => setEditEv(e)} />)}
-          </div>
-        ))
+        weekDates.map(date => {
+          const myEvs    = allWeekEvs.filter(e => e.profile === profile && e.date === date)
+          const otherEvs = allWeekEvs.filter(e => e.profile === other   && e.date === date)
+          if (myEvs.length === 0 && otherEvs.length === 0) return null
+          return (
+            <div key={date} style={{ marginBottom: 20 }}>
+              {/* Date header */}
+              <div style={{
+                fontSize: 11, fontWeight: 700, color: 'var(--tx3)',
+                textTransform: 'uppercase', letterSpacing: '.5px',
+                marginBottom: 8,
+              }}>
+                {formatDateDisplay(date, { weekday: 'long', month: 'short', day: 'numeric' })}
+              </div>
+
+              {/* Side by side columns */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {/* My column */}
+                <div>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, marginBottom: 5,
+                    color: profile === 'S' ? '#ff453a' : '#e1abf5',
+                  }}>{profile}</div>
+                  {myEvs.length === 0
+                    ? <div style={{ fontSize: 12, color: 'var(--tx3)' }}>—</div>
+                    : myEvs.map(e => (
+                        <div key={e.id} style={{ marginBottom: 4 }}>
+                          <EventCard ev={e} courses={courses} nums={nums} onClick={() => setEditEv(e)} />
+                        </div>
+                      ))
+                  }
+                </div>
+                {/* Other's column */}
+                <div>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, marginBottom: 5,
+                    color: other === 'S' ? '#ff453a' : '#e1abf5',
+                  }}>{other}</div>
+                  {otherEvs.length === 0
+                    ? <div style={{ fontSize: 12, color: 'var(--tx3)' }}>—</div>
+                    : otherEvs.map(e => (
+                        <div key={e.id} style={{ marginBottom: 4 }}>
+                          <EventCard ev={e} courses={courses} nums={nums} onClick={() => setEditEv(e)} />
+                        </div>
+                      ))
+                  }
+                </div>
+              </div>
+            </div>
+          )
+        })
       )}
 
-      <hr className="divider" />
-
-      {/* Other person's week: chips */}
-      <h2 style={{ marginBottom: 12 }}>{other}'s week</h2>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {otherWeek.length === 0
-          ? <span style={{ color: 'var(--tx3)', fontSize: 13 }}>Nothing this week.</span>
-          : otherWeek.map(e => {
-              const c = courses.find(x => x.id === e.course_id)
-              return (
-                <span key={e.id} className="chip" style={{ borderLeft: `3px solid ${c?.color || '#6366f1'}` }}>
-                  {formatDateDisplay(e.date, { weekday: 'short', day: 'numeric' })} {hhmm(e.start_time)} {eventTitle(e, courses, nums)}
-                </span>
-              )
-            })
-        }
-      </div>
-
       {addModal && <EventModal onClose={() => setAddModal(false)} defaultDate={today} />}
-      {editEv && <EventModal ev={editEv} onClose={() => setEditEv(null)} />}
+      {editEv   && <EventModal ev={editEv} onClose={() => setEditEv(null)} />}
     </Shell>
   )
 }

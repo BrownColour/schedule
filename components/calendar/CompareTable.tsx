@@ -2,19 +2,21 @@
 import { useMemo } from 'react'
 import { useApp } from '@/lib/state'
 import { EventCard } from './EventCard'
-import { hhmm, sessionNumbers, formatDateFull, timeToMins } from '@/lib/utils'
+import { sessionNumbers, formatDateFull, timeToMins, hhmm, defaultEnd } from '@/lib/utils'
 import type { Ev } from '@/lib/types'
+
+const PX_PER_MIN = 1  // 60px per hour
+
+function fmt12(h: number) {
+  const ampm = h >= 12 ? 'pm' : 'am'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}${ampm}`
+}
 
 interface Props {
   date: string
   now: Date
   onEventClick: (ev: Ev) => void
-}
-
-function minsToLabel(h: number): string {
-  const ampm = h >= 12 ? 'pm' : 'am'
-  const h12 = h % 12 === 0 ? 12 : h % 12
-  return `${h12}${ampm}`
 }
 
 export function CompareTable({ date, now, onEventClick }: Props) {
@@ -26,68 +28,152 @@ export function CompareTable({ date, now, onEventClick }: Props) {
   const theirs = events.filter(e => e.profile === other   && e.date === date)
   const all    = [...mine, ...theirs]
 
-  // Dynamic hour range: earliest session start to latest session end, min 8am–6pm
+  // Dynamic hour range based on actual events, min 8am–6pm
   const timedEvs = all.filter(e => e.start_time)
   const startHour = timedEvs.length
-    ? Math.min(8, ...timedEvs.map(e => Math.floor(timeToMins(e.start_time) / 60)))
+    ? Math.min(8, Math.floor(Math.min(...timedEvs.map(e => timeToMins(e.start_time))) / 60))
     : 8
   const endHour = timedEvs.length
-    ? Math.max(18, ...timedEvs.map(e => {
-        const endMins = e.end_time
-          ? timeToMins(e.end_time)
-          : timeToMins(e.start_time) + 80
-        return Math.ceil(endMins / 60)
-      }))
+    ? Math.max(18, Math.ceil(Math.max(...timedEvs.map(e => {
+        const end = e.end_time ? timeToMins(e.end_time) : timeToMins(e.start_time) + 80
+        return end
+      })) / 60))
     : 18
-  const HOURS = Array.from({ length: endHour - startHour }, (_, i) => i + startHour)
-  const totalMins = (endHour - startHour) * 60
 
-  const inHour = (list: Ev[], h: number) => list.filter(e => e.start_time && parseInt(e.start_time) === h)
+  const HOURS = Array.from({ length: endHour - startHour }, (_, i) => i + startHour)
+  const totalH = HOURS.length * 60  // px total height
+
+  const startMins = startHour * 60
+  const topFor = (e: Ev) => (timeToMins(e.start_time) - startMins) * PX_PER_MIN
+  const heightFor = (e: Ev) => {
+    const s = timeToMins(e.start_time)
+    const en = e.end_time ? timeToMins(e.end_time) : s + 80
+    return Math.max(44, (en - s) * PX_PER_MIN)
+  }
+
   const noTime = (list: Ev[]) => list.filter(e => !e.start_time)
+  const timed  = (list: Ev[]) => list.filter(e => !!e.start_time)
 
   const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
   const nowMins = now.getHours() * 60 + now.getMinutes()
-  const showLine = date === todayStr && nowMins >= startHour * 60 && nowMins < endHour * 60
-  const lineTop = `${((nowMins - startHour * 60) / totalMins) * 100}%`
+  const showLine = date === todayStr && nowMins >= startMins && nowMins < endHour * 60
+  const nowTop = (nowMins - startMins) * PX_PER_MIN
+
+  // Day start/end summary
+  const dayStart = (list: Ev[]) => {
+    const t = list.filter(e => e.start_time).sort((a,b) => (a.start_time||'').localeCompare(b.start_time||''))
+    return t.length ? hhmm(t[0].start_time) : null
+  }
+  const dayEnd = (list: Ev[]) => {
+    const t = list.filter(e => e.start_time).sort((a,b) => {
+      const ae = a.end_time ? timeToMins(a.end_time) : timeToMins(a.start_time)+80
+      const be = b.end_time ? timeToMins(b.end_time) : timeToMins(b.start_time)+80
+      return be - ae
+    })
+    if (!t.length) return null
+    const e = t[0]
+    return hhmm(e.end_time || defaultEnd(e.start_time!))
+  }
+
+  const ColClass = (p: string) => p === 'S' ? 'cmp-col-s' : 'cmp-col-k'
+  const HeadClass = (p: string) => p === 'S' ? 's' : 'k'
 
   return (
     <div style={{ marginBottom: 32 }}>
       <h2 style={{ marginBottom: 10, fontSize: 14, color: 'var(--tx2)', fontWeight: 600 }}>
         {formatDateFull(date)}
       </h2>
-      <div className="cmp-grid" style={{ position: 'relative' }}>
-        {/* Headers */}
+
+      {/* Column headers with day start/end */}
+      <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr', background: 'var(--s2)', borderRadius: '10px 10px 0 0', borderBottom: '1px solid var(--sep)' }}>
         <div />
-        <div className={`cmp-head ${profile === 'S' ? 's' : 'k'}`}>{profile}</div>
-        <div className={`cmp-head ${other === 'S' ? 's' : 'k'}`}>{other}</div>
+        {[profile, other].map(p => {
+          const list = p === profile ? mine : theirs
+          const s = dayStart(list)
+          const e = dayEnd(list)
+          return (
+            <div key={p} className={`cmp-head ${HeadClass(p)}`} style={{ padding: '10px 8px' }}>
+              <div style={{ fontWeight: 700 }}>{p}</div>
+              {s && e && (
+                <div style={{ fontSize: 10, fontWeight: 400, opacity: .7, marginTop: 2 }}>{s} – {e}</div>
+              )}
+              {!s && <div style={{ fontSize: 10, opacity: .4, marginTop: 2 }}>No events</div>}
+            </div>
+          )
+        })}
+      </div>
 
-        {/* No-time row */}
-        <div className="cmp-no-time">–</div>
-        <div className={`cmp-cell ${profile === 'S' ? 'cmp-col-s' : 'cmp-col-k'}`}>
-          {noTime(mine).map(e => <EventCard key={e.id} ev={e} courses={courses} nums={nums} onClick={() => onEventClick(e)} />)}
+      {/* No-time events row */}
+      {(noTime(mine).length > 0 || noTime(theirs).length > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr', background: 'var(--s2)', borderBottom: '1px solid var(--sep)' }}>
+          <div style={{ fontSize: 10, color: 'var(--tx3)', padding: '4px 4px 4px 2px', display: 'flex', alignItems: 'center' }}>–</div>
+          {[mine, theirs].map((list, i) => {
+            const p = i === 0 ? profile : other
+            return (
+              <div key={p} className={ColClass(p!)} style={{ padding: '4px' }}>
+                {noTime(list).map(e => <EventCard key={e.id} ev={e} courses={courses} nums={nums} onClick={() => onEventClick(e)} />)}
+              </div>
+            )
+          })}
         </div>
-        <div className={`cmp-cell ${other === 'S' ? 'cmp-col-s' : 'cmp-col-k'}`}>
-          {noTime(theirs).map(e => <EventCard key={e.id} ev={e} courses={courses} nums={nums} onClick={() => onEventClick(e)} />)}
+      )}
+
+      {/* Timeline grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr', background: 'var(--s2)', borderRadius: '0 0 10px 10px', position: 'relative', overflow: 'hidden' }}>
+        {/* Hour labels */}
+        <div style={{ position: 'relative', height: totalH }}>
+          {HOURS.map((h, idx) => (
+            <div key={h} style={{
+              position: 'absolute', top: idx * 60,
+              right: 6, fontSize: 10, color: 'var(--tx3)',
+              lineHeight: 1, paddingTop: 3,
+            }}>{fmt12(h)}</div>
+          ))}
         </div>
 
-        {/* Hour rows */}
-        {HOURS.map((h, idx) => {
-          const alt = idx % 2 === 1
-          return [
-            <div key={`lbl-${h}`} className={`cmp-time ${alt ? 'alt-row' : ''}`} style={{ paddingTop: 6 }}>{minsToLabel(h)}</div>,
-            <div key={`me-${h}`} className={`cmp-cell ${alt ? 'alt-row' : ''} ${profile === 'S' ? 'cmp-col-s' : 'cmp-col-k'}`}>
-              {inHour(mine, h).map(e => <EventCard key={e.id} ev={e} courses={courses} nums={nums} onClick={() => onEventClick(e)} />)}
-            </div>,
-            <div key={`th-${h}`} className={`cmp-cell ${alt ? 'alt-row' : ''} ${other === 'S' ? 'cmp-col-s' : 'cmp-col-k'}`}>
-              {inHour(theirs, h).map(e => <EventCard key={e.id} ev={e} courses={courses} nums={nums} onClick={() => onEventClick(e)} />)}
-            </div>,
-          ]
+        {/* My column */}
+        {[mine, theirs].map((list, i) => {
+          const p = i === 0 ? profile! : other
+          return (
+            <div key={p} className={ColClass(p)} style={{ position: 'relative', height: totalH, borderLeft: '1px solid var(--sep)' }}>
+              {/* Hour lines */}
+              {HOURS.map((_, idx) => (
+                <div key={idx} style={{
+                  position: 'absolute', top: idx * 60, left: 0, right: 0,
+                  borderTop: '1px solid var(--sep)',
+                  background: idx % 2 === 1 ? 'rgba(255,255,255,.012)' : undefined,
+                  height: 60,
+                  pointerEvents: 'none',
+                }} />
+              ))}
+              {/* Events */}
+              {timed(list).map(e => (
+                <div key={e.id} style={{
+                  position: 'absolute',
+                  top: topFor(e),
+                  height: heightFor(e),
+                  left: 3, right: 3,
+                  zIndex: 2,
+                }}>
+                  <EventCard ev={e} courses={courses} nums={nums} onClick={() => onEventClick(e)} style={{ height: '100%', overflow: 'hidden' }} />
+                </div>
+              ))}
+            </div>
+          )
         })}
 
-        {/* Now line */}
+        {/* Now line spanning all columns */}
         {showLine && (
-          <div className="now-line" style={{ top: lineTop, left: 0, gridColumn: '1 / -1', position: 'absolute' }}>
-            <div className="now-dot" />
+          <div style={{
+            position: 'absolute',
+            top: nowTop,
+            left: 44, right: 0,
+            height: 2,
+            background: 'var(--ac)',
+            zIndex: 5,
+            pointerEvents: 'none',
+          }}>
+            <div style={{ position: 'absolute', left: -4, top: -4, width: 10, height: 10, borderRadius: '50%', background: 'var(--ac)' }} />
           </div>
         )}
       </div>

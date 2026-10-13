@@ -1,5 +1,6 @@
 import type { Ev, Course } from '@/lib/types'
-import { hhmm, eventTitle, isDashType, sessionNumbers } from '@/lib/utils'
+import { hhmm, eventTitle, isDashType } from '@/lib/utils'
+import { parseEvExtras, ASSIGNMENT_TYPES } from '@/lib/types'
 
 interface Props {
   ev: Ev
@@ -16,7 +17,20 @@ export function EventCard({ ev, courses, nums, onClick, style, className = '' }:
   const title = eventTitle(ev, courses, nums)
   const dashed = isDashType(ev.type)
   const cancelled = ev.status === 'cancelled'
-  const timeStr = ev.start_time ? `${hhmm(ev.start_time)}–${hhmm(ev.end_time) || ''}` : ''
+  const isAssignment = ASSIGNMENT_TYPES.includes(ev.type)
+
+  // Time display: for assignments show deadline, else start–end
+  let timeStr = ''
+  if (isAssignment) {
+    const { extras } = parseEvExtras(ev.description)
+    if (extras.deadline_date) {
+      timeStr = `Due ${extras.deadline_time ? hhmm(extras.deadline_time) : 'EOD'}`
+    } else if (ev.start_time) {
+      timeStr = `${hhmm(ev.start_time)}–${hhmm(ev.end_time) || ''}`
+    }
+  } else {
+    timeStr = ev.start_time ? `${hhmm(ev.start_time)}–${hhmm(ev.end_time) || ''}` : ''
+  }
 
   return (
     <div
@@ -28,7 +42,7 @@ export function EventCard({ ev, courses, nums, onClick, style, className = '' }:
       onKeyDown={onClick ? e => e.key === 'Enter' && onClick() : undefined}
     >
       <span className="ev-title">{title}</span>
-      {timeStr && <span className="ev-meta">{timeStr}{ev.room ? ` · ${ev.room}` : ''}</span>}
+      {timeStr && <span className="ev-meta">{timeStr}{!isAssignment && ev.room ? ` · ${ev.room}` : ''}</span>}
       {course && <span className="ev-course">{course.name}</span>}
     </div>
   )

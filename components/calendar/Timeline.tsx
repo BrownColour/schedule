@@ -14,24 +14,34 @@ function fmt12(h: number) {
   return `${h12}${ampm}`
 }
 
-// Compute non-overlapping columns for a set of events in one day
+// Compute non-overlapping columns. Each event gets width based only on
+// how many events it personally overlaps with, not the day's total columns.
 function layoutEvents(evs: Ev[]): { ev: Ev; col: number; cols: number }[] {
   if (!evs.length) return []
-  const sorted = [...evs].sort((a, b) => timeToMins(a.start_time) - timeToMins(b.start_time))
-  const columns: number[] = [] // tracks end time of last event in each column
 
-  const placed: { ev: Ev; col: number }[] = sorted.map(ev => {
+  const items = evs.map(ev => {
     const start = timeToMins(ev.start_time)
-    const end = ev.end_time ? timeToMins(ev.end_time) : start + 80
-    // Find first column where the last event ended before this one starts
-    let col = columns.findIndex(colEnd => colEnd <= start)
-    if (col === -1) { col = columns.length; columns.push(end) }
-    else columns[col] = end
-    return { ev, col }
+    const end = (ev.end_time ? timeToMins(ev.end_time) : start + 80)
+    return { ev, start, end, col: 0 }
+  }).sort((a, b) => a.start - b.start)
+
+  // Assign columns greedily
+  const colEnds: number[] = []
+  items.forEach(item => {
+    let col = colEnds.findIndex(e => e <= item.start)
+    if (col === -1) { col = colEnds.length; colEnds.push(item.end) }
+    else colEnds[col] = item.end
+    item.col = col
   })
 
-  const totalCols = columns.length
-  return placed.map(p => ({ ...p, cols: totalCols }))
+  // For each event, count how many events overlap its time range
+  return items.map(item => {
+    const overlapping = items.filter(other =>
+      other.start < item.end && other.end > item.start
+    )
+    const cols = Math.max(...overlapping.map(o => o.col)) + 1
+    return { ev: item.ev, col: item.col, cols }
+  })
 }
 
 interface Props {

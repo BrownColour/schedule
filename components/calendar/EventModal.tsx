@@ -155,8 +155,10 @@ export function EventModal({ ev, defaultDate, onClose }: Props) {
     const description = buildDescription()
     try {
       if (ev) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { notes, deadline_date, deadline_time, submission_mode, ...rest } = form
         await updateEvent(ev.id, {
-          ...form,
+          ...rest,
           date: resolvedDate,
           start_time: resolvedStart,
           end_time: resolvedEnd,

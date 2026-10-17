@@ -31,7 +31,7 @@ const TABS = [
   )},
 ]
 
-export function Shell({ children, title }: { children: ReactNode; title: string }) {
+export function Shell({ children, title, action }: { children: ReactNode; title: string; action?: ReactNode }) {
   const path = usePathname()
   const router = useRouter()
   const { profile, trimesters, activeTriId } = useApp()
@@ -39,7 +39,7 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
 
   return (
     <div className="shell">
-      {/* Sidebar */}
+      {/* Sidebar (desktop) */}
       <aside className="sidebar">
         <div className="sidebar-logo">Tri<span>mester</span></div>
         <nav className="sidebar-nav">
@@ -53,17 +53,31 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
         <div className="sidebar-profile">
           <div className="profile-dot">{profile}</div>
           <div>
-            <div className="profile-name">{profile === 'S' ? 'S' : 'K'}</div>
+            <div className="profile-name">{profile}</div>
             <div className="profile-sub">{activeTri?.name || 'No trimester'}</div>
           </div>
         </div>
       </aside>
 
-      {/* Main area */}
+      {/* Main */}
       <div className="main-area">
         <header className="topbar">
           <h1 className="topbar-title">{title}</h1>
-          {children && (children as any).props?.headerActions}
+          {/* Profile + trimester visible on mobile topbar */}
+          {profile && (
+            <div className="topbar-meta">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: '50%',
+                  background: 'var(--ac)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 800, color: 'var(--bg)',
+                }}>{profile}</div>
+                {activeTri && <span style={{ fontSize: 11, color: 'var(--tx3)', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{activeTri.name}</span>}
+              </div>
+            </div>
+          )}
+          {action}
         </header>
         <main className="page-content">{children}</main>
       </div>
@@ -74,7 +88,7 @@ export function Shell({ children, title }: { children: ReactNode; title: string 
           {TABS.map(t => (
             <button key={t.path} className={`bn-item ${path === t.path ? 'active' : ''}`} onClick={() => router.push(t.path)}>
               {t.icon}
-              {t.label}
+              <span>{t.label}</span>
             </button>
           ))}
         </div>

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Shell } from '@/components/layout/Shell'
 import { Timeline } from '@/components/calendar/Timeline'
 import { MonthGrid } from '@/components/calendar/MonthGrid'
@@ -13,15 +13,10 @@ type View = 'day' | 'week' | 'month' | 'trimester'
 
 export default function CalendarPage() {
   const { loading } = useApp()
-  // Default to 'day' on mobile, 'week' on desktop
-  const [view, setView] = useState<View>('day')
+  const [view, setView] = useState<View>('week')
   const [cursor, setCursor] = useState(new Date())
   const [editEv, setEditEv] = useState<Ev | null>(null)
   const [addDate, setAddDate] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (window.innerWidth >= 769) setView('week')
-  }, [])
 
   const nav = (dir: number) => {
     setCursor(c => {

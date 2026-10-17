@@ -54,7 +54,10 @@ function EventPreview({ ev, onEdit, onClose }: { ev: Ev; onEdit: () => void; onC
         {course && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
-            <span style={{ fontSize: 13, color: 'var(--tx2)' }}>{course.name}</span>
+            <div>
+              <span style={{ fontSize: 13, color: 'var(--tx2)' }}>{course.name}</span>
+              {course.professor && <span style={{ fontSize: 12, color: 'var(--tx3)', marginLeft: 6 }}>· {course.professor}</span>}
+            </div>
           </div>
         )}
 

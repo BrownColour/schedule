@@ -5,7 +5,7 @@ import { EventCard } from './EventCard'
 import { sessionNumbers, formatDateFull, timeToMins, hhmm, defaultEnd } from '@/lib/utils'
 import type { Ev } from '@/lib/types'
 
-const PX_PER_MIN = 1  // 60px per hour
+const PX_PER_MIN = 1
 
 function fmt12(h: number) {
   const ampm = h >= 12 ? 'pm' : 'am'
@@ -27,34 +27,28 @@ export function CompareTable({ date, now, onEventClick }: Props) {
   const mine   = events.filter(e => e.profile === profile && e.date === date)
   const theirs = events.filter(e => e.profile === other   && e.date === date)
   const all    = [...mine, ...theirs]
-
-  // Dynamic hour range: earliest start to latest end across BOTH users, no cap
   const timedEvs = all.filter(e => e.start_time)
 
   const startHour = timedEvs.length
-    ? Math.floor(Math.min(...timedEvs.map(e => timeToMins(e.start_time) / 60)))
+    ? Math.max(6, Math.floor(Math.min(...timedEvs.map(e => timeToMins(e.start_time) / 60))))
     : 8
 
-  const endHour = timedEvs.length
-    ? Math.ceil(Math.max(...timedEvs.map(e => {
-        const endMins = e.end_time
-          ? timeToMins(e.end_time)
-          : timeToMins(e.start_time) + 80
-        return endMins / 60
-      })))
-    : 18
+  const latestEndMins = timedEvs.length
+    ? Math.max(...timedEvs.map(e => e.end_time ? timeToMins(e.end_time) : timeToMins(e.start_time) + 80))
+    : (startHour + 2) * 60
 
-  // Clamp to reasonable bounds but don't cut events
-  const clampedStart = Math.max(6, Math.min(startHour, 8))
-  const clampedEnd   = Math.max(endHour, clampedStart + 2) // always show at least 2 hrs
+  // Add 30 mins padding so the last card is never clipped
+  const endMins = latestEndMins + 30
+  const endHour = Math.ceil(endMins / 60)
+  const clampedEnd = Math.max(endHour, startHour + 2)
 
-  const HOURS = Array.from({ length: clampedEnd - clampedStart }, (_, i) => i + clampedStart)
-  const startMins = clampedStart * 60
-  const totalH = HOURS.length * 60
+  const HOURS = Array.from({ length: clampedEnd - startHour }, (_, i) => i + startHour)
+  const startMins = startHour * 60
+  const totalH = (clampedEnd - startHour) * 60
 
-  const topFor = (e: Ev) => Math.max(0, (timeToMins(e.start_time) - startMins)) * PX_PER_MIN
+  const topFor    = (e: Ev) => Math.max(0, timeToMins(e.start_time) - startMins) * PX_PER_MIN
   const heightFor = (e: Ev) => {
-    const s = timeToMins(e.start_time)
+    const s  = timeToMins(e.start_time)
     const en = e.end_time ? timeToMins(e.end_time) : s + 80
     return Math.max(44, (en - s) * PX_PER_MIN)
   }
@@ -78,8 +72,7 @@ export function CompareTable({ date, now, onEventClick }: Props) {
       return be - ae
     })
     if (!t.length) return null
-    const e = t[0]
-    return hhmm(e.end_time || defaultEnd(e.start_time!))
+    return hhmm(t[0].end_time || defaultEnd(t[0].start_time!))
   }
 
   const ColBg  = (p: string) => p === 'S' ? 'cmp-col-s' : 'cmp-col-k'
@@ -91,20 +84,18 @@ export function CompareTable({ date, now, onEventClick }: Props) {
         {formatDateFull(date)}
       </h2>
 
-      {/* Column headers */}
+      {/* Headers */}
       <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr', background: 'var(--s2)', borderRadius: '10px 10px 0 0', borderBottom: '1px solid var(--sep)' }}>
         <div />
         {([profile, other] as string[]).map(p => {
           const list = p === profile ? mine : theirs
-          const s = dayStart(list)
-          const e = dayEnd(list)
+          const s = dayStart(list), e = dayEnd(list)
           return (
             <div key={p} className={`cmp-head ${HeadCl(p)}`} style={{ padding: '10px 8px' }}>
               <div style={{ fontWeight: 700 }}>{p}</div>
               {s && e
                 ? <div style={{ fontSize: 10, fontWeight: 400, opacity: .7, marginTop: 2 }}>{s} – {e}</div>
-                : <div style={{ fontSize: 10, opacity: .4, marginTop: 2 }}>No events</div>
-              }
+                : <div style={{ fontSize: 10, opacity: .4, marginTop: 2 }}>No events</div>}
             </div>
           )
         })}
@@ -126,59 +117,35 @@ export function CompareTable({ date, now, onEventClick }: Props) {
       )}
 
       {/* Timeline */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: '44px 1fr 1fr',
-        background: 'var(--s2)', borderRadius: '0 0 10px 10px',
-        position: 'relative', overflow: 'hidden',
-      }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr', background: 'var(--s2)', borderRadius: '0 0 10px 10px', position: 'relative', overflow: 'hidden' }}>
         {/* Hour labels */}
         <div style={{ position: 'relative', height: totalH }}>
           {HOURS.map((h, idx) => (
-            <div key={h} style={{
-              position: 'absolute', top: idx * 60,
-              right: 6, fontSize: 10, color: 'var(--tx3)',
-              lineHeight: 1, paddingTop: 3,
-            }}>{fmt12(h)}</div>
+            <div key={h} style={{ position: 'absolute', top: idx * 60, right: 6, fontSize: 10, color: 'var(--tx3)', lineHeight: 1, paddingTop: 3 }}>
+              {fmt12(h)}
+            </div>
           ))}
         </div>
 
-        {/* Event columns */}
+        {/* Columns */}
         {([mine, theirs] as Ev[][]).map((list, i) => {
           const p = i === 0 ? profile! : other
           return (
             <div key={p} className={ColBg(p)} style={{ position: 'relative', height: totalH, borderLeft: '1px solid var(--sep)' }}>
-              {/* Hour lines */}
               {HOURS.map((_, idx) => (
-                <div key={idx} style={{
-                  position: 'absolute', top: idx * 60, left: 0, right: 0, height: 60,
-                  borderTop: '1px solid var(--sep)',
-                  background: idx % 2 === 1 ? 'rgba(255,255,255,.012)' : undefined,
-                  pointerEvents: 'none',
-                }} />
+                <div key={idx} style={{ position: 'absolute', top: idx * 60, left: 0, right: 0, height: 60, borderTop: '1px solid var(--sep)', background: idx % 2 === 1 ? 'rgba(255,255,255,.012)' : undefined, pointerEvents: 'none' }} />
               ))}
-              {/* Events */}
               {timed(list).map(e => (
-                <div key={e.id} style={{
-                  position: 'absolute',
-                  top: topFor(e),
-                  height: heightFor(e),
-                  left: 3, right: 3, zIndex: 2,
-                }}>
-                  <EventCard ev={e} courses={courses} nums={nums}
-                    onClick={() => onEventClick(e)}
-                    style={{ height: '100%', overflow: 'hidden' }} />
+                <div key={e.id} style={{ position: 'absolute', top: topFor(e), height: heightFor(e), left: 3, right: 3, zIndex: 2 }}>
+                  <EventCard ev={e} courses={courses} nums={nums} onClick={() => onEventClick(e)} style={{ height: '100%', overflow: 'hidden' }} />
                 </div>
               ))}
             </div>
           )
         })}
 
-        {/* Now line */}
         {showLine && (
-          <div style={{
-            position: 'absolute', top: nowTop, left: 44, right: 0,
-            height: 2, background: 'var(--ac)', zIndex: 5, pointerEvents: 'none',
-          }}>
+          <div style={{ position: 'absolute', top: nowTop, left: 44, right: 0, height: 2, background: 'var(--ac)', zIndex: 5, pointerEvents: 'none' }}>
             <div style={{ position: 'absolute', left: -4, top: -4, width: 10, height: 10, borderRadius: '50%', background: 'var(--ac)' }} />
           </div>
         )}

@@ -114,6 +114,11 @@ function WeekDayTimeline({ date, evs, profile, other, courses, nums, onEventClic
                         <div style={{ fontSize: 9, color: 'var(--tx2)', marginTop: 1 }}>
                           {hhmm(e.start_time)}{e.end_time ? `–${hhmm(e.end_time)}` : ''}
                         </div>
+                        {courses.find(c => c.id === e.course_id) && (
+                          <div style={{ fontSize: 9, color: 'var(--tx3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {courses.find(c => c.id === e.course_id)!.name}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )

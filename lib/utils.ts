@@ -4,12 +4,9 @@ export const ymd = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 export const addDays = (d: Date, n: number): Date => {
-  const x = new Date(d)
-  x.setDate(x.getDate() + n)
-  return x
+  const x = new Date(d); x.setDate(x.getDate() + n); return x
 }
 
-// Convert "HH:MM" or "HH:MM:SS" → "h:MMam/pm"
 export const hhmm = (t: string | null | undefined): string => {
   if (!t) return ''
   const h = parseInt(t.slice(0, 2))
@@ -51,7 +48,7 @@ export const getWeekDays = (date: Date): Date[] => {
 
 export const getMonthDays = (year: number, month: number): (Date | null)[] => {
   const first = new Date(year, month, 1)
-  const last = new Date(year, month + 1, 0)
+  const last  = new Date(year, month + 1, 0)
   const start = first.getDay() === 0 ? 6 : first.getDay() - 1
   const days: (Date | null)[] = Array(start).fill(null)
   for (let i = 1; i <= last.getDate(); i++) days.push(new Date(year, month, i))
@@ -59,19 +56,18 @@ export const getMonthDays = (year: number, month: number): (Date | null)[] => {
   return days
 }
 
-// Computed at render time; never stored. Cancelling a session renumbers the rest.
+// Returns event id → sequential number within its course+type group.
+// Sessions: Session 1, 2… Tests: Quiz 1, 2… Exams: Exam 1, 2…
+// Cancelled events are skipped so numbering stays clean.
 export const sessionNumbers = (evs: Ev[]): Record<string, number> => {
   const map: Record<string, number> = {}
   const counters: Record<string, number> = {}
-  const sessions = evs
-    .filter(e => e.type === 'session' && e.status !== 'cancelled')
-    .sort((a, b) => {
-      const ak = a.date + (a.start_time || '00:00')
-      const bk = b.date + (b.start_time || '00:00')
-      return ak.localeCompare(bk)
-    })
-  sessions.forEach(e => {
-    const k = e.course_id || '__no_course__'
+  const numbered = ['session', 'test', 'exam']
+  const sorted = evs
+    .filter(e => numbered.includes(e.type) && e.status !== 'cancelled')
+    .sort((a, b) => (a.date + (a.start_time || '00:00')).localeCompare(b.date + (b.start_time || '00:00')))
+  sorted.forEach(e => {
+    const k = `${e.course_id || '__'}::${e.type}`
     counters[k] = (counters[k] || 0) + 1
     map[e.id] = counters[k]
   })
@@ -82,6 +78,8 @@ export const eventTitle = (e: Ev, courses: import('./types').Course[], nums: Rec
   if (e.title) return e.title
   const course = courses.find(c => c.id === e.course_id)
   if (e.type === 'session' && nums[e.id]) return `Session ${nums[e.id]}`
+  if (e.type === 'test'    && nums[e.id]) return `Quiz ${nums[e.id]}`
+  if (e.type === 'exam'    && nums[e.id]) return `Exam ${nums[e.id]}`
   if (course) return course.name
   return e.type.replace(/_/g, ' ')
 }
@@ -97,7 +95,7 @@ export const getWeekGroups = (evs: Ev[]): { weekLabel: string; days: { date: str
   const weeks: { weekLabel: string; days: { date: string; evs: Ev[] }[] }[] = []
   let cur: typeof weeks[0] | null = null
   dates.forEach(d => {
-    const dt = new Date(d + 'T00:00:00')
+    const dt  = new Date(d + 'T00:00:00')
     const mon = addDays(dt, -(dt.getDay() === 0 ? 6 : dt.getDay() - 1))
     const label = `Week of ${mon.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
     if (!cur || cur.weekLabel !== label) { cur = { weekLabel: label, days: [] }; weeks.push(cur) }

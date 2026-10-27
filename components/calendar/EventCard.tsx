@@ -12,18 +12,16 @@ interface Props {
 }
 
 export function EventCard({ ev, courses, nums, onClick, style, className = '' }: Props) {
-  const course   = courses.find(c => c.id === ev.course_id)
-  const color    = course?.color || '#6366f1'
-  const title    = eventTitle(ev, courses, nums)
-  const dashed   = isDashType(ev.type)
+  const course    = courses.find(c => c.id === ev.course_id)
+  const color     = course?.color || '#6366f1'
+  const title     = eventTitle(ev, courses, nums)
+  const dashed    = isDashType(ev.type)
   const cancelled = ev.status === 'cancelled'
   const isAssignment = ASSIGNMENT_TYPES.includes(ev.type)
 
-  // Course name is the highlighted first line; session number / title is secondary
   const primaryLine   = course?.name || title
   const secondaryLine = course ? title : ''
 
-  // Time string
   let timeStr = ''
   if (isAssignment) {
     const { extras } = parseEvExtras(ev.description)
@@ -34,6 +32,8 @@ export function EventCard({ ev, courses, nums, onClick, style, className = '' }:
     timeStr = ev.start_time ? `${hhmm(ev.start_time)}–${hhmm(ev.end_time) || ''}` : ''
   }
 
+  const meta = [timeStr, !isAssignment && ev.room ? ev.room : ''].filter(Boolean).join(' · ')
+
   return (
     <div
       className={`ev-card ${dashed ? 'dashed' : ''} ${cancelled ? 'cancelled' : ''} ${className}`}
@@ -43,12 +43,60 @@ export function EventCard({ ev, courses, nums, onClick, style, className = '' }:
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? e => e.key === 'Enter' && onClick() : undefined}
     >
-      {/* Course name — bold, highlighted */}
-      <span className="ev-title">{primaryLine}</span>
-      {/* Session number / event title — muted */}
-      {secondaryLine && <span className="ev-course">{secondaryLine}</span>}
-      {/* Time */}
-      {timeStr && <span className="ev-meta">{timeStr}{!isAssignment && ev.room ? ` · ${ev.room}` : ''}</span>}
+      {/*
+        Always show all info regardless of card height.
+        Use a single flex-wrap row so content compresses horizontally
+        before it ever gets clipped vertically.
+      */}
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'baseline',
+        gap: '0 6px',
+        overflow: 'hidden',
+      }}>
+        {/* Course name — bold */}
+        <span style={{
+          fontWeight: 700,
+          fontSize: 11,
+          lineHeight: 1.3,
+          textDecoration: cancelled ? 'line-through' : undefined,
+          flexShrink: 0,
+          maxWidth: '100%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          {primaryLine}
+        </span>
+
+        {/* Time + room — always shown, wraps next to name if space allows */}
+        {meta && (
+          <span style={{
+            fontSize: 10,
+            color: 'var(--tx2)',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}>
+            {meta}
+          </span>
+        )}
+
+        {/* Session number / title — muted, wraps last */}
+        {secondaryLine && (
+          <span style={{
+            fontSize: 10,
+            color: 'var(--tx3)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            flexShrink: 1,
+            minWidth: 0,
+          }}>
+            {secondaryLine}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

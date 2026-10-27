@@ -37,66 +37,40 @@ export function EventCard({ ev, courses, nums, onClick, style, className = '' }:
   return (
     <div
       className={`ev-card ${dashed ? 'dashed' : ''} ${cancelled ? 'cancelled' : ''} ${className}`}
-      style={{ '--ev-c': color, ...style } as React.CSSProperties}
+      style={{ '--ev-c': color, containerType: 'size', ...style } as React.CSSProperties}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? e => e.key === 'Enter' && onClick() : undefined}
     >
-      {/*
-        Always show all info regardless of card height.
-        Use a single flex-wrap row so content compresses horizontally
-        before it ever gets clipped vertically.
-      */}
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'baseline',
-        gap: '0 6px',
-        overflow: 'hidden',
-      }}>
-        {/* Course name — bold */}
+      {/* TALL card (≥72px): stacked layout — course name, session title, time+room */}
+      <span className="ev-tall">
+        <span className="ev-title" style={{ textDecoration: cancelled ? 'line-through' : undefined }}>
+          {primaryLine}
+        </span>
+        {secondaryLine && <span className="ev-course">{secondaryLine}</span>}
+        {meta && <span className="ev-meta">{meta}</span>}
+      </span>
+
+      {/* SHORT card (<72px): single inline line — name · time · room */}
+      <span className="ev-short">
         <span style={{
-          fontWeight: 700,
-          fontSize: 11,
-          lineHeight: 1.3,
+          fontWeight: 700, fontSize: 11,
           textDecoration: cancelled ? 'line-through' : undefined,
-          flexShrink: 0,
-          maxWidth: '100%',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
         }}>
           {primaryLine}
         </span>
-
-        {/* Time + room — always shown, wraps next to name if space allows */}
         {meta && (
-          <span style={{
-            fontSize: 10,
-            color: 'var(--tx2)',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}>
+          <span style={{ fontSize: 10, color: 'var(--tx2)', marginLeft: 5 }}>
             {meta}
           </span>
         )}
-
-        {/* Session number / title — muted, wraps last */}
         {secondaryLine && (
-          <span style={{
-            fontSize: 10,
-            color: 'var(--tx3)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            flexShrink: 1,
-            minWidth: 0,
-          }}>
+          <span style={{ fontSize: 10, color: 'var(--tx3)', marginLeft: 5 }}>
             {secondaryLine}
           </span>
         )}
-      </div>
+      </span>
     </div>
   )
 }

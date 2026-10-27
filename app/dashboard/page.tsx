@@ -108,17 +108,19 @@ function WeekDayTimeline({ date, evs, profile, other, courses, nums, onEventClic
                         background: `color-mix(in srgb, ${color} 12%, transparent)`,
                         borderRadius: '0 6px 6px 0', padding: '3px 5px',
                       }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.3, textDecoration: e.status === 'cancelled' ? 'line-through' : undefined }}>
-                          {eventTitle(e, courses, nums)}
+                        {/* Course name — highlighted primary */}
+                        <div style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {courses.find(c => c.id === e.course_id)?.name || eventTitle(e, courses, nums)}
                         </div>
-                        <div style={{ fontSize: 9, color: 'var(--tx2)', marginTop: 1 }}>
-                          {hhmm(e.start_time)}{e.end_time ? `–${hhmm(e.end_time)}` : ''}
-                        </div>
+                        {/* Session number / title — muted secondary */}
                         {courses.find(c => c.id === e.course_id) && (
-                          <div style={{ fontSize: 9, color: 'var(--tx3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {courses.find(c => c.id === e.course_id)!.name}
+                          <div style={{ fontSize: 9, color: 'var(--tx2)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: e.status === 'cancelled' ? 'line-through' : undefined }}>
+                            {eventTitle(e, courses, nums)}
                           </div>
                         )}
+                        <div style={{ fontSize: 9, color: 'var(--tx3)', marginTop: 1 }}>
+                          {hhmm(e.start_time)}{e.end_time ? `–${hhmm(e.end_time)}` : ''}
+                        </div>
                       </div>
                     </div>
                   )

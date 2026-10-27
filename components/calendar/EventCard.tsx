@@ -12,22 +12,24 @@ interface Props {
 }
 
 export function EventCard({ ev, courses, nums, onClick, style, className = '' }: Props) {
-  const course = courses.find(c => c.id === ev.course_id)
-  const color = course?.color || '#6366f1'
-  const title = eventTitle(ev, courses, nums)
-  const dashed = isDashType(ev.type)
+  const course   = courses.find(c => c.id === ev.course_id)
+  const color    = course?.color || '#6366f1'
+  const title    = eventTitle(ev, courses, nums)
+  const dashed   = isDashType(ev.type)
   const cancelled = ev.status === 'cancelled'
   const isAssignment = ASSIGNMENT_TYPES.includes(ev.type)
 
-  // Time display: for assignments show deadline, else start–end
+  // Course name is the highlighted first line; session number / title is secondary
+  const primaryLine   = course?.name || title
+  const secondaryLine = course ? title : ''
+
+  // Time string
   let timeStr = ''
   if (isAssignment) {
     const { extras } = parseEvExtras(ev.description)
-    if (extras.deadline_date) {
-      timeStr = `Due ${extras.deadline_time ? hhmm(extras.deadline_time) : 'EOD'}`
-    } else if (ev.start_time) {
-      timeStr = `${hhmm(ev.start_time)}–${hhmm(ev.end_time) || ''}`
-    }
+    timeStr = extras.deadline_date
+      ? `Due ${extras.deadline_time ? hhmm(extras.deadline_time) : 'EOD'}`
+      : ev.start_time ? `${hhmm(ev.start_time)}–${hhmm(ev.end_time) || ''}` : ''
   } else {
     timeStr = ev.start_time ? `${hhmm(ev.start_time)}–${hhmm(ev.end_time) || ''}` : ''
   }
@@ -41,9 +43,12 @@ export function EventCard({ ev, courses, nums, onClick, style, className = '' }:
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? e => e.key === 'Enter' && onClick() : undefined}
     >
-      <span className="ev-title">{title}</span>
+      {/* Course name — bold, highlighted */}
+      <span className="ev-title">{primaryLine}</span>
+      {/* Session number / event title — muted */}
+      {secondaryLine && <span className="ev-course">{secondaryLine}</span>}
+      {/* Time */}
       {timeStr && <span className="ev-meta">{timeStr}{!isAssignment && ev.room ? ` · ${ev.room}` : ''}</span>}
-      {course && <span className="ev-course">{course.name}</span>}
     </div>
   )
 }

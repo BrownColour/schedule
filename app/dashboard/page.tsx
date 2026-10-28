@@ -15,6 +15,28 @@ function fmt12(h: number) {
   return `${h12}${ampm}`
 }
 
+function layoutEvents(evs: Ev[]): { ev: Ev; col: number; cols: number }[] {
+  if (!evs.length) return []
+  const items = evs.map(ev => ({
+    ev,
+    start: timeToMins(ev.start_time),
+    end: ev.end_time ? timeToMins(ev.end_time) : timeToMins(ev.start_time) + 80,
+    col: 0,
+  })).sort((a, b) => a.start - b.start)
+  const colEnds: number[] = []
+  items.forEach(item => {
+    let col = colEnds.findIndex(e => e <= item.start)
+    if (col === -1) { col = colEnds.length; colEnds.push(item.end) }
+    else colEnds[col] = item.end
+    item.col = col
+  })
+  return items.map(item => {
+    const overlapping = items.filter(o => o.start < item.end && o.end > item.start)
+    const cols = Math.max(...overlapping.map(o => o.col)) + 1
+    return { ev: item.ev, col: item.col, cols }
+  })
+}
+
 function WeekDayTimeline({ date, evs, profile, other, courses, nums, onEventClick }: {
   date: string; evs: Ev[]; profile: Profile; other: Profile
   courses: import('@/lib/types').Course[]; nums: Record<string, number>
@@ -93,26 +115,32 @@ function WeekDayTimeline({ date, evs, profile, other, courses, nums, onEventClic
 
           {([mine, theirs] as Ev[][]).map((list, i) => {
             const p = i === 0 ? profile : other
+            const laid = layoutEvents(list)
             return (
               <div key={p} style={{ position: 'relative', height: totalH, background: colBg(p), borderLeft: '1px solid var(--sep)' }}>
                 {HOURS.map((h, idx) => (
                   <div key={h} style={{ position: 'absolute', top: (h * 60 - startMins) * PX_PER_MIN, left: 0, right: 0, height: 60 * PX_PER_MIN, borderTop: '1px solid var(--sep)', background: idx % 2 === 1 ? 'rgba(255,255,255,.012)' : undefined, pointerEvents: 'none' }} />
                 ))}
-                {list.map(e => {
+                {laid.map(({ ev: e, col, cols }) => {
                   const color = courses.find(c => c.id === e.course_id)?.color || '#6366f1'
+                  const pct = 100 / cols
                   return (
-                    <div key={e.id} style={{ position: 'absolute', top: topFor(e), height: heightFor(e), left: 2, right: 2, zIndex: 2 }}>
+                    <div key={e.id} style={{
+                      position: 'absolute',
+                      top: topFor(e), height: heightFor(e),
+                      left: `calc(${col * pct}% + 2px)`,
+                      width: `calc(${pct}% - 4px)`,
+                      zIndex: 2,
+                    }}>
                       <div onClick={() => onEventClick(e)} style={{
                         height: '100%', overflow: 'hidden', cursor: 'pointer',
                         borderLeft: `3px solid ${color}`,
                         background: `color-mix(in srgb, ${color} 12%, transparent)`,
                         borderRadius: '0 6px 6px 0', padding: '3px 5px',
                       }}>
-                        {/* Course name — highlighted primary */}
                         <div style={{ fontSize: 10, fontWeight: 700, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {courses.find(c => c.id === e.course_id)?.name || eventTitle(e, courses, nums)}
                         </div>
-                        {/* Session number / title — muted secondary */}
                         {courses.find(c => c.id === e.course_id) && (
                           <div style={{ fontSize: 9, color: 'var(--tx2)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: e.status === 'cancelled' ? 'line-through' : undefined }}>
                             {eventTitle(e, courses, nums)}

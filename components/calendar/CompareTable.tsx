@@ -13,6 +13,32 @@ function fmt12(h: number) {
   return `${h12}${ampm}`
 }
 
+// Same algorithm as Timeline — place events into columns so overlapping
+// ones sit side by side. Returns col index and total cols for each event.
+function layoutEvents(evs: Ev[]): { ev: Ev; col: number; cols: number }[] {
+  if (!evs.length) return []
+  const items = evs.map(ev => ({
+    ev,
+    start: timeToMins(ev.start_time),
+    end: ev.end_time ? timeToMins(ev.end_time) : timeToMins(ev.start_time) + 80,
+    col: 0,
+  })).sort((a, b) => a.start - b.start)
+
+  const colEnds: number[] = []
+  items.forEach(item => {
+    let col = colEnds.findIndex(e => e <= item.start)
+    if (col === -1) { col = colEnds.length; colEnds.push(item.end) }
+    else colEnds[col] = item.end
+    item.col = col
+  })
+
+  return items.map(item => {
+    const overlapping = items.filter(o => o.start < item.end && o.end > item.start)
+    const cols = Math.max(...overlapping.map(o => o.col)) + 1
+    return { ev: item.ev, col: item.col, cols }
+  })
+}
+
 interface Props {
   date: string
   now: Date
@@ -37,14 +63,13 @@ export function CompareTable({ date, now, onEventClick }: Props) {
     ? Math.max(...timedEvs.map(e => e.end_time ? timeToMins(e.end_time) : timeToMins(e.start_time) + 80))
     : (startHour + 2) * 60
 
-  // Add 30 mins padding so the last card is never clipped
-  const endMins = latestEndMins + 30
-  const endHour = Math.ceil(endMins / 60)
+  const endMins    = latestEndMins + 30
+  const endHour    = Math.ceil(endMins / 60)
   const clampedEnd = Math.max(endHour, startHour + 2)
 
-  const HOURS = Array.from({ length: clampedEnd - startHour }, (_, i) => i + startHour)
+  const HOURS    = Array.from({ length: clampedEnd - startHour }, (_, i) => i + startHour)
   const startMins = startHour * 60
-  const totalH = (clampedEnd - startHour) * 60
+  const totalH   = (clampedEnd - startHour) * 60
 
   const topFor    = (e: Ev) => Math.max(0, timeToMins(e.start_time) - startMins) * PX_PER_MIN
   const heightFor = (e: Ev) => {
@@ -77,6 +102,41 @@ export function CompareTable({ date, now, onEventClick }: Props) {
 
   const ColBg  = (p: string) => p === 'S' ? 'cmp-col-s' : 'cmp-col-k'
   const HeadCl = (p: string) => p === 'S' ? 's' : 'k'
+
+  const renderColumn = (list: Ev[], p: string) => {
+    const laid = layoutEvents(timed(list))
+    return (
+      <div className={ColBg(p)} style={{ position: 'relative', height: totalH, borderLeft: '1px solid var(--sep)' }}>
+        {/* Hour lines */}
+        {HOURS.map((_, idx) => (
+          <div key={idx} style={{
+            position: 'absolute', top: idx * 60, left: 0, right: 0, height: 60,
+            borderTop: '1px solid var(--sep)',
+            background: idx % 2 === 1 ? 'rgba(255,255,255,.012)' : undefined,
+            pointerEvents: 'none',
+          }} />
+        ))}
+        {/* Events — side by side when overlapping */}
+        {laid.map(({ ev, col, cols }) => {
+          const pct = 100 / cols
+          return (
+            <div key={ev.id} style={{
+              position: 'absolute',
+              top: topFor(ev),
+              height: heightFor(ev),
+              left: `calc(${col * pct}% + 2px)`,
+              width: `calc(${pct}% - 4px)`,
+              zIndex: 2,
+            }}>
+              <EventCard ev={ev} courses={courses} nums={nums}
+                onClick={() => onEventClick(ev)}
+                style={{ height: '100%', overflow: 'hidden' }} />
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
 
   return (
     <div style={{ marginBottom: 32 }}>
@@ -127,23 +187,10 @@ export function CompareTable({ date, now, onEventClick }: Props) {
           ))}
         </div>
 
-        {/* Columns */}
-        {([mine, theirs] as Ev[][]).map((list, i) => {
-          const p = i === 0 ? profile! : other
-          return (
-            <div key={p} className={ColBg(p)} style={{ position: 'relative', height: totalH, borderLeft: '1px solid var(--sep)' }}>
-              {HOURS.map((_, idx) => (
-                <div key={idx} style={{ position: 'absolute', top: idx * 60, left: 0, right: 0, height: 60, borderTop: '1px solid var(--sep)', background: idx % 2 === 1 ? 'rgba(255,255,255,.012)' : undefined, pointerEvents: 'none' }} />
-              ))}
-              {timed(list).map(e => (
-                <div key={e.id} style={{ position: 'absolute', top: topFor(e), height: heightFor(e), left: 3, right: 3, zIndex: 2 }}>
-                  <EventCard ev={e} courses={courses} nums={nums} onClick={() => onEventClick(e)} style={{ height: '100%', overflow: 'hidden' }} />
-                </div>
-              ))}
-            </div>
-          )
-        })}
+        {renderColumn(mine,   profile!)}
+        {renderColumn(theirs, other)}
 
+        {/* Now line */}
         {showLine && (
           <div style={{ position: 'absolute', top: nowTop, left: 44, right: 0, height: 2, background: 'var(--ac)', zIndex: 5, pointerEvents: 'none' }}>
             <div style={{ position: 'absolute', left: -4, top: -4, width: 10, height: 10, borderRadius: '50%', background: 'var(--ac)' }} />
